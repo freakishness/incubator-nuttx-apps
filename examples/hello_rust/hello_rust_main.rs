@@ -1,5 +1,5 @@
 /****************************************************************************
- * apps/netutils/netlib/netlib_getifstatus.c
+ * apps/examples/hello_rust/hello_rust_main.rs
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -19,75 +19,39 @@
  ****************************************************************************/
 
 /****************************************************************************
- * Included Files
+ * Attributes
  ****************************************************************************/
 
-#include <nuttx/config.h>
-
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-
-#include <netinet/in.h>
-#include <net/if.h>
-
-#include "netutils/netlib.h"
-
-#ifdef CONFIG_NET
+#![no_main]
 
 /****************************************************************************
- * Public Functions
+ * Externs
  ****************************************************************************/
 
-/****************************************************************************
- * Name: netlib_getifstatus
- *
- * Description:
- *   Get the network driver ifup/ifdown status
- *
- * Parameters:
- *   ifname   The name of the interface to use
- *   flags    The interface flags returned by SIOCGIFFLAGS
- *
- * Return:
- *   0 on success; -1 on failure
- *
- ****************************************************************************/
-
-int netlib_getifstatus(FAR const char *ifname, FAR uint8_t *flags)
+extern "C"
 {
-  int ret = ERROR;
-  if (ifname)
-    {
-      /* Get a socket (only so that we get access to the INET subsystem) */
-
-      int sockfd = socket(NET_SOCK_FAMILY, NET_SOCK_TYPE, NET_SOCK_PROTOCOL);
-      if (sockfd >= 0)
-        {
-          struct ifreq req;
-          memset (&req, 0, sizeof(struct ifreq));
-
-          /* Put the driver name into the request */
-
-          strlcpy(req.ifr_name, ifname, IFNAMSIZ);
-
-          /* Perform the ioctl to ifup or ifdown status */
-
-          ret = ioctl(sockfd, SIOCGIFFLAGS, (unsigned long)&req);
-          if (!ret)
-            {
-              *flags = req.ifr_flags;
-            }
-
-          close(sockfd);
-        }
-    }
-
-  return ret;
+    pub fn printf(format: *const u8, ...) -> i32;
 }
 
-#endif /* CONFIG_NET */
+/****************************************************************************
+ * Public functions
+ ****************************************************************************/
+
+/****************************************************************************
+ * hello_rust_main
+ ****************************************************************************/
+
+#[no_mangle]
+pub extern "C" fn hello_rust_main(_argc: i32, _argv: *const *const u8) -> i32
+{
+    /* "Hello, Rust!!" using printf() from libc */
+
+    unsafe
+      {
+        printf(b"Hello, Rust!!\n\0" as *const u8);
+      }
+
+    /* exit with status 0 */
+
+    0
+}

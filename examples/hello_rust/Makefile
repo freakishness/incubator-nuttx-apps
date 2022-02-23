@@ -1,5 +1,5 @@
 ############################################################################
-# apps/mlearning/libnnablart/Make.defs
+# apps/examples/hello_rust/Make.defs
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,9 +18,17 @@
 #
 ############################################################################
 
-ifeq ($(CONFIG_NNABLA_RT),y)
-CONFIGURED_APPS += $(APPDIR)/mlearning/libnnablart
+include $(APPDIR)/Make.defs
 
-CFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/mlearning/libnnablart/nnabla-c-runtime/include/}
-CXXFLAGS += ${shell $(INCDIR) $(INCDIROPT) "$(CC)" $(APPDIR)/mlearning/libnnablart/nnabla-c-runtime/include/}
-endif
+# Hello, Rust! built-in application info
+
+PROGNAME  = $(CONFIG_EXAMPLES_HELLO_RUST_PROGNAME)
+PRIORITY  = $(CONFIG_EXAMPLES_HELLO_RUST_PRIORITY)
+STACKSIZE = $(CONFIG_EXAMPLES_HELLO_RUST_STACKSIZE)
+MODULE    = $(CONFIG_EXAMPLES_HELLO_RUST)
+
+# Hello, Rust! Example
+
+MAINSRC = hello_rust_main.rs
+
+include $(APPDIR)/Application.mk
