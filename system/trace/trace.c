@@ -142,10 +142,22 @@ static int trace_cmd_start(int index, int argc, FAR char **argv,
 static int trace_cmd_dump(int index, int argc, FAR char **argv,
                           int notectlfd)
 {
+  trace_dump_t type = TRACE_TYPE_LTTNG_KERNEL;
   FAR FILE *out = stdout;
-  int ret;
   bool changed = false;
   bool cont = false;
+  int ret;
+
+  /* Usage: trace dump [-a] "Custom Format : Android SysTrace" */
+
+  if (index < argc)
+    {
+      if (strcmp(argv[index], "-a") == 0)
+        {
+          index++;
+          type = TRACE_TYPE_ANDROID;
+        }
+    }
 
   /* Usage: trace dump [-c][<filename>] */
 
@@ -189,7 +201,7 @@ static int trace_cmd_dump(int index, int argc, FAR char **argv,
 
   /* Dump the trace data */
 
-  ret = trace_dump(out);
+  ret = trace_dump(type, out);
 
   if (changed)
     {
@@ -325,6 +337,19 @@ static int trace_cmd_mode(int index, int argc, FAR char **argv,
             break;
 #endif
 
+#ifdef CONFIG_SCHED_INSTRUMENTATION_SWITCH
+          case 'w':   /* Switch trace */
+            if (enable)
+              {
+                mode.flag |= NOTE_FILTER_MODE_FLAG_SWITCH;
+              }
+            else
+              {
+                mode.flag &= ~NOTE_FILTER_MODE_FLAG_SWITCH;
+              }
+            break;
+#endif
+
 #ifdef CONFIG_SCHED_INSTRUMENTATION_SYSCALL
           case 's':   /* Syscall trace */
             if (enable)
@@ -358,6 +383,19 @@ static int trace_cmd_mode(int index, int argc, FAR char **argv,
             else
               {
                 mode.flag &= ~NOTE_FILTER_MODE_FLAG_IRQ;
+              }
+            break;
+#endif
+
+#ifdef CONFIG_SCHED_INSTRUMENTATION_DUMP
+          case 'd':   /* Dump trace */
+            if (enable)
+              {
+                mode.flag |= NOTE_FILTER_MODE_FLAG_DUMP;
+              }
+            else
+              {
+                mode.flag &= ~NOTE_FILTER_MODE_FLAG_DUMP;
               }
             break;
 #endif
@@ -439,6 +477,57 @@ static int trace_cmd_mode(int index, int argc, FAR char **argv,
 
   return index;
 }
+
+/****************************************************************************
+ * Name: trace_cmd_switch
+ ****************************************************************************/
+
+#ifdef CONFIG_SCHED_INSTRUMENTATION_SWITCH
+static int trace_cmd_switch(int index, int argc, FAR char **argv,
+                            int notectlfd)
+{
+  bool enable;
+  struct note_filter_mode_s mode;
+
+  /* Usage: trace switch [+|-] */
+
+  /* Get current filter setting */
+
+  ioctl(notectlfd, NOTECTL_GETMODE, (unsigned long)&mode);
+
+  /* Parse the setting parameters */
+
+  if (index < argc)
+    {
+      if (argv[index][0] == '-' || argv[index][0] == '+')
+        {
+          enable = (argv[index][0] == '+');
+          if (enable ==
+              ((mode.flag & NOTE_FILTER_MODE_FLAG_SWITCH) != 0))
+            {
+              /* Already set */
+
+              return false;
+            }
+
+          if (enable)
+            {
+              mode.flag |= NOTE_FILTER_MODE_FLAG_SWITCH;
+            }
+          else
+            {
+              mode.flag &= ~NOTE_FILTER_MODE_FLAG_SWITCH;
+            }
+
+          ioctl(notectlfd, NOTECTL_SETMODE, (unsigned long)&mode);
+
+          index++;
+        }
+    }
+
+  return index;
+}
+#endif
 
 /****************************************************************************
  * Name: trace_cmd_syscall
@@ -643,6 +732,57 @@ static int trace_cmd_irq(int index, int argc, FAR char **argv, int notectlfd)
 #endif
 
 /****************************************************************************
+ * Name: trace_cmd_print
+ ****************************************************************************/
+
+#ifdef CONFIG_SCHED_INSTRUMENTATION_DUMP
+static int trace_cmd_print(int index, int argc, FAR char **argv,
+                           int notectlfd)
+{
+  bool enable;
+  struct note_filter_mode_s mode;
+
+  /* Usage: trace print [+|-] */
+
+  /* Get current filter setting */
+
+  ioctl(notectlfd, NOTECTL_GETMODE, (unsigned long)&mode);
+
+  /* Parse the setting parameters */
+
+  if (index < argc)
+    {
+      if (argv[index][0] == '-' || argv[index][0] == '+')
+        {
+          enable = (argv[index][0] == '+');
+          if (enable ==
+              ((mode.flag & NOTE_FILTER_MODE_FLAG_DUMP) != 0))
+            {
+              /* Already set */
+
+              return false;
+            }
+
+          if (enable)
+            {
+              mode.flag |= NOTE_FILTER_MODE_FLAG_DUMP;
+            }
+          else
+            {
+              mode.flag &= ~NOTE_FILTER_MODE_FLAG_DUMP;
+            }
+
+          ioctl(notectlfd, NOTECTL_SETMODE, (unsigned long)&mode);
+
+          index++;
+        }
+    }
+
+  return index;
+}
+#endif
+
+/****************************************************************************
  * Name: show_usage
  ****************************************************************************/
 
@@ -660,11 +800,16 @@ static void show_usage(void)
                                 " Get the trace while running <command>\n"
 #endif
 #ifdef CONFIG_DRIVER_NOTERAM
-          "  dump [-c][<filename>]           :"
+          "  dump [-a][-c][<filename>]           :"
                                 " Output the trace result\n"
+                                " [-a] <Android SysTrace>\n"
 #endif
-          "  mode [{+|-}{o|s|a|i}...]        :"
+          "  mode [{+|-}{o|w|s|a|i|d}...]        :"
                                 " Set task trace options\n"
+#ifdef CONFIG_SCHED_INSTRUMENTATION_SWITCH
+          "  switch [+|-] :"
+                                " Configure switch trace filter\n"
+#endif
 #ifdef CONFIG_SCHED_INSTRUMENTATION_SYSCALL
           "  syscall [{+|-}<syscallname>...] :"
                                 " Configure syscall trace filter\n"
@@ -672,6 +817,10 @@ static void show_usage(void)
 #ifdef CONFIG_SCHED_INSTRUMENTATION_IRQHANDLER
           "  irq [{+|-}<irqnum>...]          :"
                                 " Configure IRQ trace filter\n"
+#endif
+#ifdef CONFIG_SCHED_INSTRUMENTATION_DUMP
+          "  print [+|-] :"
+                                " Configure dump trace filter\n"
 #endif
          );
 }
@@ -734,6 +883,12 @@ int main(int argc, FAR char *argv[])
         {
           i = trace_cmd_mode(i + 1, argc, argv, notectlfd);
         }
+#ifdef CONFIG_SCHED_INSTRUMENTATION_SWITCH
+      else if (strcmp(argv[i], "switch") == 0)
+        {
+          i = trace_cmd_switch(i + 1, argc, argv, notectlfd);
+        }
+#endif
 #ifdef CONFIG_SCHED_INSTRUMENTATION_SYSCALL
       else if (strcmp(argv[i], "syscall") == 0)
         {
@@ -744,6 +899,12 @@ int main(int argc, FAR char *argv[])
       else if (strcmp(argv[i], "irq") == 0)
         {
           i = trace_cmd_irq(i + 1, argc, argv, notectlfd);
+        }
+#endif
+#ifdef CONFIG_SCHED_INSTRUMENTATION_DUMP
+      else if (strcmp(argv[i], "print") == 0)
+        {
+          i = trace_cmd_print(i + 1, argc, argv, notectlfd);
         }
 #endif
       else
