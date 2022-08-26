@@ -273,7 +273,6 @@ config NSH_DISABLE_DIRNAME
 config NSH_DISABLE_DMESG
 	bool "Disable dmesg"
 	default DEFAULT_SMALL
-	depends on RAMLOG_SYSLOG
 
 config NSH_DISABLE_ECHO
 	bool "Disable echo"
@@ -401,7 +400,7 @@ config NSH_DISABLE_NSFMOUNT
 config NSH_DISABLE_NSLOOKUP
 	bool "Disable nslookup"
 	default DEFAULT_SMALL
-	depends on LIBC_NETDB && NETDB_DNSCLIENT
+	depends on LIBC_NETDB
 
 config NSH_DISABLE_PASSWD
 	bool "Disable passwd"
@@ -854,6 +853,12 @@ config NSH_FATMOUNTPT
 		will mount a FAT FS under /tmp. This is the location where the FAT
 		FS will be mounted.  Default is "/tmp".
 
+config NSH_SCRIPT_REDIRECT_PATH
+	string "rcS redirect output"
+	default ""
+	---help---
+		This option can redirect rcS output.such as /dev/log or other.
+
 endif # NSH_ROMFSETC
 endmenu # Scripting Support
 
@@ -1150,6 +1155,12 @@ config NSH_IOBUFFER_SIZE
 	---help---
 		Determines the size of the I/O buffer to use for sending/
 		receiving TELNET commands/responses.  Default: 512
+
+config NSH_DISABLE_TELNETSTART
+	bool "Disable to start telnetd"
+	default false
+	---help---
+		Determines if the nsh starts telnetd automatically
 
 endif # NSH_TELNET
 endmenu # Telnet Configuration

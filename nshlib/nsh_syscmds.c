@@ -71,6 +71,10 @@
                         UNAME_MACHINE | UNAME_PLATFORM)
 #endif
 
+#ifndef CONFIG_NSH_PROC_MOUNTPOINT
+#  define CONFIG_NSH_PROC_MOUNTPOINT "/proc"
+#endif
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -172,6 +176,30 @@ int cmd_shutdown(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  ****************************************************************************/
 
 #if defined(CONFIG_PM) && !defined(CONFIG_NSH_DISABLE_PMCONFIG)
+static int cmd_pmconfig_recursive(FAR struct nsh_vtbl_s *vtbl,
+                                  FAR const char *dirpath,
+                                  FAR struct dirent *entryp,
+                                  FAR void *pvarg)
+{
+  char *path;
+  int ret = ERROR;
+
+  if (DIRENT_ISDIRECTORY(entryp->d_type))
+    {
+      return 0;
+    }
+
+  path = nsh_getdirpath(vtbl, dirpath, entryp->d_name);
+  if (path)
+    {
+      nsh_output(vtbl, "\n%s:\n", path);
+      ret = nsh_catfile(vtbl, pvarg, path);
+      free(path);
+    }
+
+  return ret;
+}
+
 int cmd_pmconfig(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 {
   struct boardioc_pm_ctrl_s ctrl =
@@ -180,11 +208,8 @@ int cmd_pmconfig(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 
   if (argc <= 2)
     {
-      int current_state;
-      int normal_count;
-      int idle_count;
-      int standby_count;
-      int sleep_count;
+      int next_state;
+      int last_state;
 
       if (argc == 2)
         {
@@ -193,27 +218,18 @@ int cmd_pmconfig(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 
       ctrl.action = BOARDIOC_PM_QUERYSTATE;
       boardctl(BOARDIOC_PM_CONTROL, (uintptr_t)&ctrl);
-      current_state = ctrl.state;
+      last_state = ctrl.state;
 
-      ctrl.action = BOARDIOC_PM_STAYCOUNT;
-      ctrl.state = PM_NORMAL;
+      ctrl.action = BOARDIOC_PM_CHECKSTATE;
       boardctl(BOARDIOC_PM_CONTROL, (uintptr_t)&ctrl);
-      normal_count = ctrl.count;
+      next_state = ctrl.state;
 
-      ctrl.state = PM_IDLE;
-      boardctl(BOARDIOC_PM_CONTROL, (uintptr_t)&ctrl);
-      idle_count = ctrl.count;
+      nsh_output(vtbl, "Last state %d, Next state %d\n",
+                 last_state, next_state);
 
-      ctrl.state = PM_STANDBY;
-      boardctl(BOARDIOC_PM_CONTROL, (uintptr_t)&ctrl);
-      standby_count = ctrl.count;
-
-      ctrl.state = PM_SLEEP;
-      boardctl(BOARDIOC_PM_CONTROL, (uintptr_t)&ctrl);
-      sleep_count = ctrl.count;
-
-      nsh_output(vtbl, "Current state %d, PM stay [%d, %d, %d, %d]\n",
-        current_state, normal_count, idle_count, standby_count, sleep_count);
+      return nsh_foreach_direntry(vtbl, argv[0],
+                                  CONFIG_NSH_PROC_MOUNTPOINT "/pm",
+                                  cmd_pmconfig_recursive, argv[0]);
     }
   else if (argc <= 4)
     {
@@ -333,18 +349,20 @@ int cmd_reboot(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 #if defined(CONFIG_BOARDCTL_RESET_CAUSE) && !defined(CONFIG_NSH_DISABLE_RESET_CAUSE)
 int cmd_reset_cause(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
 {
+  UNUSED(argc);
+
   int ret;
   struct boardioc_reset_cause_s cause;
 
   memset(&cause, 0, sizeof(cause));
-  ret = boardctl(BOARDIOC_RESET_CAUSE, &cause);
+  ret = boardctl(BOARDIOC_RESET_CAUSE, (uintptr_t)&cause);
   if (ret < 0)
     {
       nsh_error(vtbl, g_fmtcmdfailed, argv[0], "boardctl", NSH_ERRNO);
       return ERROR;
     }
 
-  nsh_output(vtbl, "cause:0x%x, flag:0x%" PRIx32 "\n",
+  nsh_output(vtbl, "cause:0x%x,flag:0x%" PRIx32 "\n",
              cause.cause, cause.flag);
   return OK;
 }
@@ -386,7 +404,8 @@ static int cmd_rptun_once(FAR struct nsh_vtbl_s *vtbl,
     }
   else if (strcmp(argv[1], "ping") == 0)
     {
-      if (argv[3] == 0 || argv[4] == 0 || argv[5] == 0)
+      if (argv[3] == 0 || argv[4] == 0 ||
+          argv[5] == 0 || argv[6] == 0)
         {
           return ERROR;
         }
@@ -394,6 +413,7 @@ static int cmd_rptun_once(FAR struct nsh_vtbl_s *vtbl,
       ping.times = atoi(argv[3]);
       ping.len   = atoi(argv[4]);
       ping.ack   = atoi(argv[5]);
+      ping.sleep = atoi(argv[6]);
 
       cmd = RPTUNIOC_PING;
       val = (unsigned long)&ping;
@@ -604,7 +624,7 @@ int cmd_uname(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
               nsh_output(vtbl, " ");
             }
 
-          nsh_output(vtbl, str);
+          nsh_output(vtbl, "%s", str);
           first = false;
         }
     }
