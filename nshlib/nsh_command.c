@@ -65,20 +65,21 @@ struct cmdmap_s
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_HELP
-static int  cmd_help(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv);
+static int  cmd_help(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv);
 #endif
 
 #ifndef CONFIG_NSH_DISABLESCRIPT
-static int  cmd_true(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv);
-static int  cmd_false(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv);
+static int  cmd_true(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv);
+static int  cmd_false(FAR struct nsh_vtbl_s *vtbl, int argc,
+                      FAR char **argv);
 #endif
 
 #ifndef CONFIG_NSH_DISABLE_EXIT
-static int  cmd_exit(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv);
+static int  cmd_exit(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv);
 #endif
 
 static int  cmd_unrecognized(FAR struct nsh_vtbl_s *vtbl, int argc,
-                             char **argv);
+                             FAR char **argv);
 
 /****************************************************************************
  * Private Data
@@ -152,11 +153,6 @@ static const struct cmdmap_s g_cmdmap[] =
 
 #ifndef CONFIG_NSH_DISABLE_DIRNAME
   { "dirname",  cmd_dirname,  2, 2, "<path>" },
-#endif
-
-#ifndef CONFIG_NSH_DISABLE_TIMEDATECTL
-  { "timedatectl", cmd_timedatectl, 1, 3, "[set-timezone TZ]"
-  },
 #endif
 
 #ifndef CONFIG_NSH_DISABLE_DATE
@@ -537,6 +533,10 @@ static const struct cmdmap_s g_cmdmap[] =
   { "time",     cmd_time,     2, 2, "\"<command>\"" },
 #endif
 
+#ifndef CONFIG_NSH_DISABLE_TIMEDATECTL
+  { "timedatectl", cmd_timedatectl, 1, 3, "[set-timezone TZ]" },
+#endif
+
 #ifndef CONFIG_NSH_DISABLESCRIPT
   { "true",     cmd_true,     1, 1, NULL },
 #endif
@@ -563,6 +563,10 @@ static const struct cmdmap_s g_cmdmap[] =
 
 #ifndef CONFIG_NSH_DISABLE_UNSET
   { "unset",    cmd_unset,    2, 2, "<name>" },
+#endif
+
+#ifndef CONFIG_NSH_DISABLE_UPTIME
+  { "uptime",   cmd_uptime,   1, 2, "[-sph]" },
 #endif
 
 #if defined(CONFIG_NETUTILS_CODECS) && defined(CONFIG_CODECS_URLCODE)
@@ -884,7 +888,7 @@ static inline void help_builtins(FAR struct nsh_vtbl_s *vtbl)
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_HELP
-static int cmd_help(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+static int cmd_help(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   FAR const char *cmd = NULL;
 #ifndef CONFIG_NSH_HELP_TERSE
@@ -968,7 +972,7 @@ static int cmd_help(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  ****************************************************************************/
 
 static int cmd_unrecognized(FAR struct nsh_vtbl_s *vtbl, int argc,
-                            char **argv)
+                            FAR char **argv)
 {
   UNUSED(argc);
 
@@ -981,7 +985,7 @@ static int cmd_unrecognized(FAR struct nsh_vtbl_s *vtbl, int argc,
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLESCRIPT
-static int cmd_true(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+static int cmd_true(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   UNUSED(vtbl);
   UNUSED(argc);
@@ -997,7 +1001,7 @@ static int cmd_true(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLESCRIPT
-static int cmd_false(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+static int cmd_false(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   UNUSED(vtbl);
   UNUSED(argc);
@@ -1012,7 +1016,7 @@ static int cmd_false(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  ****************************************************************************/
 
 #ifndef CONFIG_NSH_DISABLE_EXIT
-static int cmd_exit(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
+static int cmd_exit(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
 {
   UNUSED(argc);
   UNUSED(argv);
@@ -1038,7 +1042,7 @@ static int cmd_exit(FAR struct nsh_vtbl_s *vtbl, int argc, char **argv)
  *
  ****************************************************************************/
 
-int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, char *argv[])
+int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char *argv[])
 {
   const struct cmdmap_s *cmdmap;
   const char            *cmd;
@@ -1160,7 +1164,7 @@ int nsh_extmatch_count(FAR char *name, FAR int *matches, int namelen)
     defined(CONFIG_READLINE_HAVE_EXTMATCH)
 FAR const char *nsh_extmatch_getname(int index)
 {
-  DEBUGASSERT(index > 0 && index <= NUM_CMDS);
+  DEBUGASSERT(index > 0 && index <= (int)NUM_CMDS);
   return  g_cmdmap[index].cmd;
 }
 #endif
